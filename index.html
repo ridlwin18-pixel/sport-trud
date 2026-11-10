@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Игра → Труд</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: start screen = football pitch map with 4 nodes around a center circle "Игра → Труд";
+   each node opens a deck of slides paged with ← →, Esc returns to the map. Light sports-magazine look. */
+:root{
+  --paper:#f5f6f2; --card:#ffffff; --ink:#151a17; --muted:#5d665f; --line:#d9ddd5;
+  --pitch:#1d6b45; --pitch-soft:#e3efe7; --chalk:#c9d6cc; --whistle:#d4472b;
+  --f-display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --f-body:"Golos Text","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#111613; --card:#19201c; --ink:#eef2ee; --muted:#9aa69d; --line:#2c3630;
+  --pitch:#4fbf85; --pitch-soft:#1b2c22; --chalk:#2e4136; --whistle:#ff7a5c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#111613; --card:#19201c; --ink:#eef2ee; --muted:#9aa69d; --line:#2c3630;
+  --pitch:#4fbf85; --pitch-soft:#1b2c22; --chalk:#2e4136; --whistle:#ff7a5c; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.08;letter-spacing:-.01em}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--pitch)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--whistle);outline-offset:3px;border-radius:4px}
+
+/* ===== MAP ===== */
+#map{max-width:1180px;margin:0 auto;padding-block:28px 40px;display:grid;gap:22px}
+.map-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:12px}
+.map-head h1{font-size:clamp(28px,4.4vw,52px);font-weight:800}
+.map-head p{color:var(--muted);max-width:44ch}
+.pitch{position:relative;border:2px solid var(--chalk);border-radius:6px;background:var(--pitch-soft);
+  display:grid;grid-template-columns:1fr minmax(200px,260px) 1fr;grid-template-rows:auto auto;gap:18px;padding:22px}
+.pitch::before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:2px solid var(--chalk)}
+.pitch::after{content:"";position:absolute;inset:50% auto auto 0;width:100%;border-top:2px dashed var(--chalk);opacity:.6}
+.center{grid-column:2;grid-row:1/3;align-self:center;justify-self:center;position:relative;z-index:1;
+  width:min(240px,100%);aspect-ratio:1;border-radius:50%;border:2px solid var(--chalk);background:var(--paper);
+  display:grid;place-content:center;text-align:center;gap:6px;padding:20px}
+.center b{font-family:var(--f-display);font-size:24px;line-height:1.1}
+.center b span{color:var(--pitch)}
+.center small{color:var(--muted);font-size:13px}
+.node{position:relative;z-index:1;display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px;cursor:pointer;
+  transition:transform .2s,box-shadow .2s}
+.node:hover{transform:translateY(-3px);box-shadow:0 10px 24px -14px rgba(0,0,0,.35)}
+.node img{width:120px;height:96px;object-fit:cover;border-radius:4px;display:block}
+.node .num{font-family:var(--f-mono);font-size:12px;color:var(--pitch)}
+.node h3{font-size:19px;margin:2px 0 4px}
+.node p{font-size:14px;color:var(--muted);line-height:1.35}
+.n1{grid-column:1;grid-row:1}.n2{grid-column:3;grid-row:1}.n3{grid-column:1;grid-row:2}.n4{grid-column:3;grid-row:2}
+.map-foot{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--ink);background:transparent;border-radius:999px;
+  padding:10px 20px;font-weight:600;cursor:pointer}
+.btn.solid{background:var(--ink);color:var(--paper)}
+.hint{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+kbd{font-family:var(--f-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;background:var(--card)}
+
+/* ===== DECK ===== */
+.deck{height:100%;display:grid;grid-template-rows:auto 1fr auto;max-width:1280px;margin:0 auto}
+.bar{display:flex;align-items:center;gap:14px;padding-block:14px;border-bottom:1px solid var(--line)}
+.bar .to-map{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;cursor:pointer;font-size:14px}
+.bar .title{font-family:var(--f-display);font-size:15px;font-weight:700}
+.dots{margin-left:auto;display:flex;gap:6px}
+.dots i{width:22px;height:4px;border-radius:2px;background:var(--line)}
+.dots i.on{background:var(--pitch)}
+.stage{position:relative;overflow:hidden;min-height:0}
+.slide{position:absolute;inset:0;overflow-y:auto;padding-block:26px;display:grid;align-content:center;
+  opacity:0;transform:translateX(30px);transition:opacity .35s,transform .35s;pointer-events:none}
+.slide.on{opacity:1;transform:none;pointer-events:auto}
+.slide.back{transform:translateX(-30px)}
+.nav{display:flex;justify-content:space-between;align-items:center;padding-block:12px;border-top:1px solid var(--line)}
+.nav button{border:2px solid var(--ink);background:transparent;border-radius:999px;width:46px;height:46px;cursor:pointer;font-size:20px}
+.nav button:disabled{opacity:.25;cursor:default}
+.nav .count{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+
+/* slide building blocks */
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:center}
+.split.rev>figure{order:2}
+figure{margin:0;position:relative}
+figure img{width:100%;max-height:68vh;object-fit:cover;border-radius:4px;display:block}
+figcaption{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:.04em}
+.txt{display:grid;gap:16px;min-width:0}
+.txt h2{font-size:clamp(26px,3.4vw,44px);font-weight:800}
+.txt h2 em{font-style:normal;color:var(--pitch)}
+.lead{font-size:clamp(17px,1.6vw,21px)}
+.who{border-left:3px solid var(--pitch);padding-left:12px;font-size:15px;color:var(--muted)}
+.who b{color:var(--ink)}
+.list{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.list li{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+.list li::before{content:attr(data-n);font-family:var(--f-mono);font-size:13px;color:var(--pitch);padding-top:3px}
+.x li::before{content:"✕";color:var(--whistle)}
+.quote{font-family:var(--f-display);font-size:clamp(20px,2.4vw,30px);font-weight:500;line-height:1.25}
+.quote small{display:block;font-family:var(--f-body);font-size:14px;color:var(--muted);margin-top:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.cell{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:8px;align-content:start;min-width:0}
+.cell .k{font-family:var(--f-mono);font-size:12px;color:var(--pitch);text-transform:uppercase;letter-spacing:.08em}
+.cell h3{font-size:18px}
+.cell p{font-size:15px;color:var(--muted)}
+.cell .ex{font-size:14px;color:var(--ink);border-top:1px dashed var(--line);padding-top:8px}
+.big{font-family:var(--f-display);font-weight:800;font-size:clamp(36px,5vw,64px);line-height:1;color:var(--pitch);font-variant-numeric:tabular-nums}
+.wide h2{font-size:clamp(24px,3vw,38px);font-weight:800;margin-bottom:18px}
+.wide h2 em{font-style:normal;color:var(--pitch)}
+.inner{display:grid;gap:18px}
+
+/* scale of control */
+.scale{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.step{display:grid;gap:8px}
+.step img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px}
+.step h3{font-size:16px}
+.meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.meter span{display:block;height:100%;background:var(--pitch)}
+.step p{font-size:13px;color:var(--muted)}
+
+/* tables */
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:16px}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td:first-child{font-weight:600}
+td.w{color:var(--pitch);font-weight:600}
+
+/* timeline */
+.tl{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;position:relative}
+.tl::before{content:"";position:absolute;left:0;right:0;top:22px;border-top:2px solid var(--pitch)}
+.tl div{position:relative;padding:44px 12px 0 0;display:grid;gap:6px;align-content:start}
+.tl div::before{content:"";position:absolute;top:15px;left:0;width:14px;height:14px;border-radius:50%;background:var(--paper);border:3px solid var(--pitch)}
+.tl b{font-family:var(--f-display);font-size:20px}
+.tl p{font-size:14px;color:var(--muted)}
+
+/* day schedule */
+.day{display:flex;flex-wrap:wrap;gap:8px}
+.day span{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:14px}
+.day span.t{background:var(--pitch);color:var(--paper);border-color:var(--pitch)}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.week div{border-radius:4px;padding:8px 4px;text-align:center;font-size:12px;background:var(--pitch-soft);display:grid;gap:2px}
+.week div b{font-family:var(--f-mono);font-size:12px}
+.week .m{background:var(--whistle);color:#fff}
+.week .o{background:var(--card);border:1px dashed var(--line)}
+
+.bridge{font-style:italic;color:var(--muted);font-size:15px;border-top:1px solid var(--line);padding-top:12px}
+.src{font-size:13px;color:var(--muted)}
+.src a{color:var(--pitch)}
+.authors{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;font-size:15px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+.authors .eyebrow{margin-right:4px}
+.rec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(20px,4vw,56px);align-items:center}
+.qr{background:#fff;padding:16px;border-radius:6px;border:1px solid var(--line);display:grid;gap:8px;justify-items:center}
+.qr #qrbox{width:220px;height:220px}
+.qr #qrbox img,.qr #qrbox canvas{width:220px;height:220px}
+.qr span{font-family:var(--f-mono);font-size:12px;color:#151a17}
+.link{display:inline-flex;align-items:center;gap:10px;font-weight:600;color:var(--pitch);font-size:18px;word-break:break-all}
+@media (max-width:640px){.rec{grid-template-columns:minmax(0,1fr)}.qr{justify-self:start}}
+
+@media (max-width:860px){
+  .pitch{grid-template-columns:1fr;padding:14px}
+  .pitch::before,.pitch::after{display:none}
+  .center{grid-column:1;grid-row:auto;width:200px;order:-1}
+  .n1,.n2,.n3,.n4{grid-column:1;grid-row:auto}
+  .split{grid-template-columns:minmax(0,1fr)}
+  .split.rev>figure{order:0}
+  figure img{max-height:38vh}
+  .grid4,.scale{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid3{grid-template-columns:minmax(0,1fr)}
+  .tl{grid-template-columns:minmax(0,1fr)}
+  .tl::before{left:6px;right:auto;top:0;bottom:0;border-top:0;border-left:2px solid var(--pitch)}
+  .tl div{padding:0 0 18px 30px}
+  .tl div::before{top:4px}
+  .slide{align-content:start}
+}
+@media (max-width:460px){.node{grid-template-columns:84px 1fr}.node img{width:84px;height:72px}.grid2{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<!-- ================= MAP ================= -->
+<main id="map">
+  <div class="map-head">
+    <div>
+      <div class="eyebrow">Спорт как социальный феномен · групповое выступление</div>
+      <h1>Спорт как труд<br>и дисциплина</h1>
+    </div>
+    <p>Как тренировочный процесс берёт тело под контроль и превращает игру в работу. Выберите раздел на поле.</p>
+  </div>
+
+  <div class="pitch">
+    <div class="center">
+      <small>ось темы</small>
+      <b>Игра <span>→</span><br>Труд</b>
+      <small>тотальный контроль<br>и трансформация тела</small>
+    </div>
+    <button class="node n1" data-go="theory">
+      <img src="img/p04.jpg" alt="Профессиональные футболисты проходят координационную лестницу">
+      <span><span class="num">01 · Теория</span><h3>Как работает дисциплина</h3><p>Хёйзинга, Фуко, Гуттман, Элиас, Бром</p></span>
+    </button>
+    <button class="node n2" data-go="history">
+      <img src="img/p07.jpg" alt="Гравюра: ранний футбол на лугу у частной школы">
+      <span><span class="num">02 · История</span><h3>Когда игра стала профессией</h3><p>Англия 1885, СССР, путь российского футбола</p></span>
+    </button>
+    <button class="node n3" data-go="krasnodar">
+      <img src="img/p10.jpg" alt="Воспитанники академии «Краснодара» на тренировке у стадиона">
+      <span><span class="num">03 · Кейс</span><h3>Академия «Краснодара»</h3><p>Дисциплинарная машина сегодня</p></span>
+    </button>
+    <button class="node n4" data-go="favelas">
+      <img src="img/p13.jpg" alt="Футзальная площадка среди домов фавелы">
+      <span><span class="num">04 · Контраст</span><h3>Фавелы Бразилии</h3><p>Свободная игра на входе, рынок на выходе</p></span>
+    </button>
+  </div>
+
+  <div class="map-foot">
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn solid" data-go="intro">Начать с введения →</button>
+      <button class="btn" data-go="outro">Вывод</button>
+    </div>
+    <span class="hint">Листать: <kbd>←</kbd> <kbd>→</kbd> · на карту: <kbd>Esc</kbd></span>
+  </div>
+  <p class="authors"><span class="eyebrow">Авторы проекта</span> Анна Булгакова · Артём Ермолаев · Савелий Косиков · Мария Карышева · Алексей Олейник · Дмитрий Черноусов</p>
+</main>
+
+<!-- ================= INTRO ================= -->
+<section class="deck" id="intro" data-title="Введение" hidden>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p02.jpg" alt="Дети играют в футбол на улице, архивное фото"><figcaption>Улица. Ворота из курток.</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">Введение</div>
+        <h2>Мяч одинаковый. <em>Занятия разные.</em></h2>
+        <p class="lead">Один мальчик бьёт по мячу во дворе, пока не позовут ужинать. Другой — на поле академии в 16:30 по расписанию, с датчиком на груди и тренером, который записывает каждое касание.</p>
+        <p>Первый играет. Второй уже работает, хотя до первой зарплаты ему лет восемь.</p>
+      </div>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split rev">
+      <figure><img src="img/p01.jpg" alt="Мальчики гоняют мяч на песчаном пустыре, архивное фото"></figure>
+      <div class="txt">
+        <div class="eyebrow">Наш тезис</div>
+        <h2>Профессиональный спорт — <em>переработка игры в труд</em></h2>
+        <div class="grid2">
+          <div class="cell"><span class="k">Сырьё</span><h3>Человеческое тело</h3><p>и желание играть</p></div>
+          <div class="cell"><span class="k">Продукт</span><h3>Измеримый результат</h3><p>который можно продать</p></div>
+        </div>
+        <p>Для этого тело берут под тотальный контроль: время, пространство, питание, сон, движения, даже мысли о доме.</p>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Шкала контроля</div>
+      <h2>Чем дальше от двора, <em>тем меньше свободы</em></h2>
+      <div class="scale">
+        <div class="step"><img src="img/p02.jpg" alt="Уличный футбол"><h3>Двор</h3><div class="meter"><span style="width:8%"></span></div><p>Играют, пока хочется. Правила придумывают на ходу.</p></div>
+        <div class="step"><img src="img/p03.jpg" alt="Детская команда в форме"><h3>Любители</h3><div class="meter"><span style="width:35%"></span></div><p>Форма, расписание раз в неделю, тренер. Но это ещё досуг.</p></div>
+        <div class="step"><img src="img/p10.jpg" alt="Тренировка в академии"><h3>Академия</h3><div class="meter"><span style="width:75%"></span></div><p>Интернат, две тренировки в день, отбор и отсев.</p></div>
+        <div class="step"><img src="img/p05.jpg" alt="Тренировка профессионального клуба"><h3>Профи</h3><div class="meter"><span style="width:96%"></span></div><p>Контракт. Тело — актив клуба, каждый шаг измерен.</p></div>
+      </div>
+      <p class="bridge">Разберём, как это работает, в четыре шага: теория → история → «Краснодар» → фавелы.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ================= THEORY ================= -->
+<section class="deck" id="theory" data-title="01 · Теория" hidden>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p01.jpg" alt="Дворовый футбол на пустыре"><figcaption>Игра по Хёйзинге: добровольно, вне обычной жизни, без выгоды.</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">Точка отсчёта</div>
+        <h2>Что такое <em>игра</em></h2>
+        <p class="who"><b>Йохан Хёйзинга</b> (1872–1945) — нидерландский историк культуры. В книге «Homo ludens» («Человек играющий», 1938) доказывал, что культура выросла из игры. Нам он даёт определение того, от чего спорт уходит.</p>
+        <p>Три признака игры — и профессиональный спорт нарушает каждый:</p>
+        <ul class="list x">
+          <li><span><b>Добровольно</b> → в профи приходят по контракту</span></li>
+          <li><span><b>Вне обычной жизни</b> → спорт и есть повседневная жизнь</span></li>
+          <li><span><b>Без выгоды</b> → за него платят</span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Механизм</div>
+      <h2>Фуко: как делают <em>«послушные тела»</em></h2>
+      <p class="who" style="max-width:80ch"><b>Мишель Фуко</b> (1926–1984) — французский философ, исследовал власть и контроль над телом. В «Надзирать и наказывать» (1975) показал, как армия, школа и фабрика делают людей полезными и покорными. О спорте почти не писал, но тренировка ложится на его схему точно.</p>
+      <div class="grid4">
+        <div class="cell"><span class="k">Техника 1</span><h3>Место</h3><p>Распределение в пространстве</p><p class="ex">Закрытая база, своя комната, своя позиция на поле</p></div>
+        <div class="cell"><span class="k">Техника 2</span><h3>Время</h3><p>Контроль деятельности</p><p class="ex">Расписание по минутам, ни одной пустой паузы</p></div>
+        <div class="cell"><span class="k">Техника 3</span><h3>Движение</h3><p>Поэтапное обучение</p><p class="ex">Удар = опорная нога + замах + точка контакта</p></div>
+        <div class="cell"><span class="k">Техника 4</span><h3>Команда</h3><p>Композиция сил</p><p class="ex">Одиннадцать тел собраны в один механизм по схеме</p></div>
+      </div>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split rev">
+      <figure><img src="img/p04.jpg" alt="Футболисты сборной на координационной лестнице"><figcaption>Движение, разобранное на элементы.</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">На чём держится система</div>
+        <h2>Три инструмента <em>контроля</em></h2>
+        <ul class="list">
+          <li data-n="01"><span><b>Надзор.</b> Тренер, видеоанализ, GPS-датчики — видно всё.</span></li>
+          <li data-n="02"><span><b>Нормализующая санкция.</b> Штраф, скамейка, отчисление.</span></li>
+          <li data-n="03"><span><b>Экзамен.</b> Тесты, просмотры, контрольные игры.</span></li>
+        </ul>
+        <p class="quote">Со временем надзор становится внутренним.<small>Спортсмен контролирует себя сам, даже когда никто не смотрит.</small></p>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Ещё три опоры</div>
+      <h2>Цифры, правила, <em>конвейер</em></h2>
+      <div class="grid3">
+        <div class="cell"><span class="k">Измерение</span><h3>Аллен Гуттман</h3><p>Американский историк спорта, «От ритуала к рекорду» (1978).</p><p class="ex">Античный бегун бежал ради богов, современный — ради секунд в протоколе. Тело становится показателем.</p></div>
+        <div class="cell"><span class="k">Самоконтроль</span><h3>Норберт Элиас и Эрик Даннинг</h3><p>Немецко-британский социолог и его ученик, основатели социологии спорта, «В поисках возбуждения» (1986).</p><p class="ex">«Спортизация»: народные забавы обросли правилами, судьями и требованием держать себя в руках.</p></div>
+        <div class="cell"><span class="k">Конвейер</span><h3>Жан-Мари Бром</h3><p>Французский социолог, критик спорта, «Спорт — тюрьма измеряемого времени» (1978).</p><p class="ex">Тренировка копирует заводскую линию: ценность спортсмена равна его производительности.</p></div>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Итог теории</div>
+      <h2>Игра <em>vs</em> труд</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Критерий</th><th>Игра · двор</th><th>Труд · профи</th></tr></thead>
+        <tbody>
+          <tr><td>Мотив</td><td>Удовольствие</td><td class="w">Контракт, результат, деньги</td></tr>
+          <tr><td>Время</td><td>Пока хочется</td><td class="w">Расписание по минутам</td></tr>
+          <tr><td>Пространство</td><td>Любое</td><td class="w">Закрытая база, своё место</td></tr>
+          <tr><td>Тело</td><td>Принадлежит игроку</td><td class="w">Объект контроля клуба</td></tr>
+          <tr><td>Ошибка</td><td>Повод посмеяться</td><td class="w">Санкция, риск отчисления</td></tr>
+          <tr><td>Итог</td><td>Ничего не производит</td><td class="w">Измеримый показатель</td></tr>
+        </tbody>
+      </table></div>
+      <p class="bridge">Теория объясняет механизм, но не отвечает, когда он включился. Возвращаемся в XIX век.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ================= HISTORY ================= -->
+<section class="deck" id="history" data-title="02 · История" hidden>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p07.jpg" alt="Гравюра: футбол на лугу, вдали здание школы"><figcaption>Футбол частных школ: досуг джентльменов.</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">Англия, середина XIX века</div>
+        <h2>Сначала футбол был <em>досугом элиты</em></h2>
+        <p class="lead">Правила придумали в частных школах и университетах. Для их выпускников игра была способом провести свободное время.</p>
+        <p>Деньги за футбол считались неприличными: джентльмен играет ради удовольствия.</p>
+      </div>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split rev">
+      <figure><img src="img/p08.jpg" alt="Цветная иллюстрация: матч у ворот, толпа зрителей"><figcaption>Футбол викторианской Англии: публика, ворота с перекладиной, борьба у штрафной.</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">Перелом</div>
+        <div class="big">1885</div>
+        <h2>Игра входит в <em>индустриальный ритм</em></h2>
+        <ul class="list">
+          <li data-n="→"><span>Клубы промышленного Севера («Престон», «Блэкберн») тайно платят рабочим за матчи.</span></li>
+          <li data-n="→"><span>Футбольная ассоциация сначала борется, а потом легализует профессионализм.</span></li>
+          <li data-n="→"><span>1888 — Футбольная лига с регулярным календарём: рабочая неделя, матч в субботу, зарплата.</span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Два других пути</div>
+      <h2>Любительство на бумаге, <em>труд на деле</em></h2>
+      <div class="grid2">
+        <div class="cell"><span class="k">Олимпизм</span><h3>1913 · Джим Торп</h3><p>Олимпийское движение полвека держалось за любительство. У Торпа отобрали олимпийское золото за то, что раньше он играл в бейсбол за деньги.</p></div>
+        <div class="cell"><span class="k">СССР</span><h3>«Государственные любители»</h3><p>Официально любители, фактически военные или заводские рабочие с зарплатой за тренировки. Вертикаль: ГТО для масс → ДЮСШ для отбора → команды мастеров для результата.</p></div>
+      </div>
+      <div class="cell" style="background:var(--pitch-soft)"><span class="k">Наука о теле</span><h3>Теория периодизации Льва Матвеева (1960-е)</h3><p>Год делится на циклы, циклы на недели, недели на занятия с заданной нагрузкой. По сути, пятилетка для отдельного тела. Схема до сих пор лежит в основе подготовки во всём мире.</p></div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Россия</div>
+      <h2>Российский футбол: <em>путь за век</em></h2>
+      <div class="tl">
+        <div><b>1890-е</b><p>Футбол завозят британские инженеры и служащие фабрик. Досуг «для своих».</p></div>
+        <div><b>1936</b><p>Первый чемпионат СССР среди команд мастеров. Формально рабочие, фактически профессионалы.</p></div>
+        <div><b>1970-е</b><p>Лобановский и учёный Зеленцов в киевском «Динамо»: модели нагрузок, тесты, расчёт действий каждого игрока.</p></div>
+        <div><b>1990-е</b><p>Профессионализм признают официально: контракты, трансферы.</p></div>
+        <div><b>2008</b><p>Сергей Галицкий основывает «Краснодар», в 2011-м открывается школа-интернат клуба.</p></div>
+      </div>
+      <p class="bridge">Советская система опиралась на государство, современная — на частного владельца. Логика осталась прежней. Лучше всего её видно в Краснодаре.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ================= KRASNODAR ================= -->
+<section class="deck" id="krasnodar" data-title="03 · Академия «Краснодара»" hidden>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p09.jpg" alt="Воспитанники академии «Краснодара» идут по территории базы"><figcaption>Фото: yuga.ru</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">Кейс</div>
+        <h2>Академия «Краснодара» — <em>Фуко с мячом</em></h2>
+        <div class="grid2">
+          <div class="cell"><div class="big">≈350</div><p>воспитанников живут и учатся в школе-интернате клуба</p></div>
+          <div class="cell"><div class="big">11–17</div><p>лет — возраст воспитанников, все прошли конкурсный отбор</p></div>
+          <div class="cell"><div class="big">21</div><p>воспитанник академии сыграл в РПЛ в сезоне 2023/24</p></div>
+          <div class="cell"><div class="big">2025</div><p>клуб — чемпион России с выпускниками в основе</p></div>
+        </div>
+      </div>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split rev">
+      <figure><img src="img/p10.jpg" alt="Тренировка воспитанников у стадиона «Краснодар»"></figure>
+      <div class="txt">
+        <div class="eyebrow">Техника «время»</div>
+        <h2>Неделя, в которой <em>негде выдохнуть</em></h2>
+        <p>День воспитанника со слов форварда Владимира Хубулова:</p>
+        <div class="day">
+          <span>Подъём</span><span>Завтрак</span><span class="t">Тренировка</span><span>2–3 урока</span><span>Перерыв 20 мин</span><span>2–3 урока</span><span class="t">Тренировка</span><span>Ужин</span><span>Домашка</span>
+        </div>
+        <div class="week">
+          <div><b>Пн</b>2 трен.</div><div><b>Вт</b>2 трен.</div><div><b>Ср</b>2 трен.</div><div><b>Чт</b>2 трен.</div><div><b>Пт</b>2 трен.</div><div class="m"><b>Сб</b>матч</div><div class="o"><b>Вс</b>выходной</div>
+        </div>
+        <p class="src">Это около десяти тренировок в неделю — шесть-семь лет подряд.</p>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Техники «место» и «надзор»</div>
+      <h2>Город — <em>за забором базы</em></h2>
+      <div class="grid3">
+        <div class="cell"><span class="k">Пространство</span><h3>Выход по расписанию</h3><p>Гулять — только по выходным. Кино и дискотека — раз в месяц.</p></div>
+        <div class="cell"><span class="k">Надзор</span><h3>Телефон — воспитателю</h3><p>После отбоя телефоны сдают. Нарушителей наказывают дежурством.</p></div>
+        <div class="cell"><span class="k">Сопротивление</span><h3>Игра в обход контроля</h3><p>Подростки сдавали старые аппараты, а со своих продолжали переписываться.</p></div>
+      </div>
+      <p class="src">Источник: воспоминания воспитанников академии, <a href="https://sport24.ru/football/article-krasnodar-galitskiy-vedernikov-khubulov-litvinov-safonov-spertsyan" target="_blank" rel="noopener">Sport24</a></p>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p11.jpg" alt="Юные футболисты «Краснодара» в игровом эпизоде"></figure>
+      <div class="txt">
+        <div class="eyebrow">Тело и голова</div>
+        <h2>Тело — <em>проект клуба</em></h2>
+        <p>Режим с 11 лет лепит мышцы, выносливость и автоматизм движений. Подросток растёт под требования конкретной профессии.</p>
+        <p class="quote">Внешний контроль превращается во внутренний.<small>Защитник Данила Ведерников признавался: подростком ненавидел правила, а повзрослев, понял, что академия научила его терпению и дисциплине.</small></p>
+        <p>Выпускнику уже не нужен воспитатель: перед матчем он сам ляжет спать вовремя.</p>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Экзамен и санкция</div>
+      <h2>Отсев: <em>выдерживают не все</em></h2>
+      <div class="grid2">
+        <div class="cell"><span class="k">Случай</span><h3>Иван Игнатьев</h3><p>В 13 лет, после первого года, не вернулся с каникул: «хочу остаться дома». Тренеры, по их словам, десятки раз уговаривали его не бросать футбол.</p></div>
+        <div class="cell"><span class="k">Логика системы</span><h3>Вячеслав Литвинов</h3><p>Кто терпит — идёт к цели. Кто нет — уходит из футбола и ищет другую профессию.</p></div>
+      </div>
+      <div class="cell" style="background:var(--pitch-soft)"><h3>Сотни детей проходят систему — до премьер-лиги доходят единицы</h3><p>Остальные отдали футболу детство и получили режим, к которому вне спорта уже некуда приложить.</p></div>
+      <p class="bridge">Краснодар строит дисциплину сверху — деньгами, стенами и расписанием. Но есть места, где звёзды будто рождаются вопреки любой системе.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ================= FAVELAS ================= -->
+<section class="deck" id="favelas" data-title="04 · Фавелы" hidden>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p12.jpg" alt="Мурал на стене дома в фавеле над футбольным полем"><figcaption>Мурал над полем в Жардин Пери, Сан-Паулу: «С улиц Пери — на чемпионат мира».</figcaption></figure>
+      <div class="txt">
+        <div class="eyebrow">Миф</div>
+        <h2>«Природный» <em>бразильский талант</em></h2>
+        <p class="lead">Бразилия кажется опровержением всего сказанного. Здесь футбол начинается как чистая игра по Хёйзинге: босиком, на асфальте, без тренера.</p>
+        <ul class="list">
+          <li data-n="→"><span><b>Ромарио</b> — вырос в фавеле Жакарезинью</span></li>
+          <li data-n="→"><span><b>Габриэл Жезус</b> — бедный район Жардин Пери, Сан-Паулу</span></li>
+          <li data-n="→"><span><b>Винисиус</b> — Сан-Гонсалу под Рио</span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split rev">
+      <figure><img src="img/p13.jpg" alt="Матч на футзальной площадке, зажатой домами фавелы"></figure>
+      <div class="txt">
+        <div class="eyebrow">Улица как школа</div>
+        <h2>Узкая площадка <em>учит решать за долю секунды</em></h2>
+        <p>Улица и футзал дают то, что не поставишь в академии: импровизацию и технику в тесноте, без подсказки тренера.</p>
+        <p>Через футзал прошли Роналдиньо и Неймар.</p>
+        <p class="quote">Это игра в чистом виде — и бесплатная школа техники.</p>
+      </div>
+    </div>
+  </article>
+  <article class="slide">
+    <div class="split">
+      <figure><img src="img/p14.jpg" alt="Дети из фавелы на футбольном поле, позади жилые дома"></figure>
+      <div class="txt">
+        <div class="eyebrow">Рынок</div>
+        <h2>Звездой делает <em>система</em></h2>
+        <ul class="list">
+          <li data-n="01"><span>За талантами из фавел охотятся скауты и агенты.</span></li>
+          <li data-n="02"><span>До 2015 года, пока ФИФА не запретила, инвесторы покупали долю в правах на юного игрока — вкладывались в чужое тело как в актив.</span></li>
+          <li data-n="03"><span>Винисиуса взяли в академию «Фламенго» ребёнком.</span></li>
+        </ul>
+        <div class="cell"><div class="big">€45 млн</div><p>заплатил «Реал» за 16-летнего Винисиуса</p></div>
+      </div>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Сравнение</div>
+      <h2>Один режим, <em>разные ставки</em></h2>
+      <div class="tbl"><table>
+        <thead><tr><th></th><th>Академия «Краснодара»</th><th>Фавела</th></tr></thead>
+        <tbody>
+          <tr><td>Вход</td><td>Конкурсный отбор</td><td>Улица, футзал, скаут</td></tr>
+          <tr><td>Кто навязывает дисциплину</td><td>Клуб</td><td class="w">Рынок</td></tr>
+          <tr><td>Можно ли уйти</td><td>Да, домой</td><td class="w">Некуда: дома бедность</td></tr>
+          <tr><td>Ставка</td><td>Карьера</td><td class="w">Социальный лифт для всей семьи</td></tr>
+          <tr><td>Как принимают режим</td><td>Через надзор и правила</td><td class="w">Добровольно</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </article>
+</section>
+
+<!-- ================= OUTRO ================= -->
+<section class="deck" id="outro" data-title="Вывод" hidden>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Вывод</div>
+      <h2>Фавела и академия — <em>два этапа одного процесса</em></h2>
+      <div class="grid2">
+        <figure><img src="img/p02.jpg" alt="Уличный футбол" style="aspect-ratio:3/2;max-height:34vh"><figcaption>Игра поставляет сырьё: желание, азарт, импровизацию.</figcaption></figure>
+        <figure><img src="img/p05.jpg" alt="Тренировка профессиональных футболистов" style="aspect-ratio:3/2;max-height:34vh"><figcaption>Дисциплина перерабатывает его в продукт с ценой и показателями.</figcaption></figure>
+      </div>
+      <p class="quote">Профессиональный спорт не отменяет игру — он её присваивает.<small>Цена — детство по расписанию и тело, которое принадлежит клубу раньше, чем самому спортсмену. За каждым финтом на поле стоят годы труда по чужому плану.</small></p>
+    </div>
+  </article>
+  <article class="slide wide">
+    <div class="inner">
+      <div class="eyebrow">Рекомендуем посмотреть</div>
+      <div class="rec">
+        <div class="txt">
+          <h2>Как устроен профессиональный футбол в России — <em>с самых низов</em></h2>
+          <p class="lead">Если тема зацепила, посмотрите ролик: он показывает путь в профессию изнутри.</p>
+          <a class="link" href="https://www.youtube.com/watch?v=MLmsEpCPcO8" target="_blank" rel="noopener">▶ Смотреть на YouTube</a>
+          <p class="src">youtube.com/watch?v=MLmsEpCPcO8</p>
+        </div>
+        <div class="qr"><div id="qrbox" role="img" aria-label="QR-код со ссылкой на ролик"></div><span>Наведите камеру</span></div>
+      </div>
+      <p class="authors"><span class="eyebrow">Авторы проекта</span> Анна Булгакова · Артём Ермолаев · Савелий Косиков · Мария Карышева · Алексей Олейник · Дмитрий Черноусов</p>
+    </div>
+  </article>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+(function(){
+  const map=document.getElementById('map');
+  const decks=[...document.querySelectorAll('.deck')];
+  const order=['intro','theory','history','krasnodar','favelas','outro'];
+  let cur=null, idx=0;
+
+  decks.forEach(d=>{
+    const slides=[...d.querySelectorAll('.slide')];
+    const stage=document.createElement('div'); stage.className='stage';
+    slides.forEach(s=>stage.appendChild(s));
+    const bar=document.createElement('header'); bar.className='bar';
+    bar.innerHTML='<button class="to-map" type="button">← Карта</button><span class="title"></span><span class="dots"></span>';
+    bar.querySelector('.title').textContent=d.dataset.title;
+    bar.querySelector('.dots').innerHTML=slides.map(()=>'<i></i>').join('');
+    const nav=document.createElement('footer'); nav.className='nav';
+    nav.innerHTML='<button type="button" class="prev" aria-label="Назад">←</button><span class="count"></span><button type="button" class="next" aria-label="Вперёд">→</button>';
+    d.append(bar,stage,nav);
+    bar.querySelector('.to-map').onclick=()=>go('');
+    nav.querySelector('.prev').onclick=()=>step(-1);
+    nav.querySelector('.next').onclick=()=>step(1);
+  });
+
+  function render(dir){
+    const d=document.getElementById(cur); const slides=d.querySelectorAll('.slide');
+    slides.forEach((s,i)=>{s.classList.toggle('on',i===idx);s.classList.toggle('back',i<idx);});
+    d.querySelectorAll('.dots i').forEach((x,i)=>x.classList.toggle('on',i<=idx));
+    const n=order.indexOf(cur);
+    d.querySelector('.count').textContent=(idx+1)+' / '+slides.length;
+    d.querySelector('.prev').disabled=(idx===0&&n<=0);
+    d.querySelector('.next').disabled=(idx===slides.length-1&&n===order.length-1);
+    slides[idx].scrollTop=0;
+  }
+  function show(id,last){
+    map.hidden=!!id; decks.forEach(d=>d.hidden=d.id!==id);
+    cur=id||null;
+    if(cur){ const len=document.getElementById(cur).querySelectorAll('.slide').length; idx=last?len-1:0; render(); }
+    else window.scrollTo(0,0);
+  }
+  function go(id,last){
+    if((location.hash.slice(1)||'')===id){show(id,last);return;}
+    pendingLast=!!last; location.hash=id?id:'';
+    if(!id) history.replaceState(null,'',location.pathname+location.search);
+    if(!id) show('');
+  }
+  let pendingLast=false;
+  function step(k){
+    if(!cur) return;
+    const len=document.getElementById(cur).querySelectorAll('.slide').length;
+    const n=order.indexOf(cur);
+    if(idx+k>=0&&idx+k<len){idx+=k;render();return;}
+    if(k>0&&n<order.length-1) go(order[n+1]);
+    if(k<0&&n>0) go(order[n-1],true);
+  }
+  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);show(order.includes(h)?h:'',pendingLast);pendingLast=false;});
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='PageDown'){if(cur){e.preventDefault();step(1);}}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){if(cur){e.preventDefault();step(-1);}}
+    else if(e.key==='Escape'){if(cur)go('');}
+  });
+  // swipe on touch screens
+  let x0=null;
+  document.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});
+  document.addEventListener('touchend',e=>{if(x0===null||!cur)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>60)step(dx<0?1:-1);x0=null;});
+  const h=location.hash.slice(1); show(order.includes(h)?h:'');
+  try{ if(window.QRCode) new QRCode(document.getElementById('qrbox'),{text:'https://www.youtube.com/watch?v=MLmsEpCPcO8',width:220,height:220,colorDark:'#151a17',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M}); }catch(e){}
+})();
+</script>
+
+</body>
+</html>
